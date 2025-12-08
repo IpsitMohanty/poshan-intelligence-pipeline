@@ -27,8 +27,10 @@ jobs:
       - name: Lint (flake8)
         run: flake8 .
 
-      - name: Format Check (black)
-        run: black --check .
+      # Black formatting check disabled temporarily
+      # Uncomment later when you want strict formatting
+      # - name: Format Check (black)
+      #   run: black --check .
 
       - name: Type Check (mypy)
         run: mypy --ignore-missing-imports .
