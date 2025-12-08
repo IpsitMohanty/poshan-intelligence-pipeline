@@ -1,0 +1,116 @@
+{
+    "correlate.py": [
+        "analytics.correlations",
+        "pandas"
+    ],
+    "introspect.py": [
+        "ast",
+        "json",
+        "os",
+        "pathlib"
+    ],
+    "main.py": [
+        "api.schemas",
+        "fastapi",
+        "joblib",
+        "pandas",
+        "pathlib"
+    ],
+    "models_runner.py": [
+        "analytics.models",
+        "datetime",
+        "joblib",
+        "pandas",
+        "pathlib"
+    ],
+    "visuals.py": [
+        "analytics.visualize",
+        "os"
+    ],
+    "correlations.py": [
+        "pandas"
+    ],
+    "models.py": [
+        "joblib",
+        "pathlib"
+    ],
+    "visualize.py": [
+        "matplotlib.pyplot",
+        "os",
+        "pandas"
+    ],
+    "__init__.py": [],
+    "schemas.py": [
+        "pydantic"
+    ],
+    "awc_cube.py": [],
+    "district_cube.py": [
+        "etl.adolescent_girls",
+        "etl.anaemia",
+        "etl.awc_summary",
+        "etl.gm_5_6",
+        "etl.gwg",
+        "etl.home_visit",
+        "etl.lbw",
+        "etl.measuring_efficiency",
+        "etl.snp",
+        "pandas"
+    ],
+    "adolescent_girls.py": [
+        "etl.loader",
+        "pandas"
+    ],
+    "anaemia.py": [
+        "etl.loader",
+        "pandas"
+    ],
+    "awc_summary.py": [
+        "etl.loader",
+        "pandas"
+    ],
+    "cleaner.py": [
+        "pandas"
+    ],
+    "gm_5_6.py": [
+        "etl.loader",
+        "pandas"
+    ],
+    "gwg.py": [
+        "etl.loader",
+        "pandas"
+    ],
+    "home_visit.py": [
+        "etl.loader",
+        "pandas"
+    ],
+    "lbw.py": [
+        "etl.loader",
+        "pandas"
+    ],
+    "loader.py": [
+        "os",
+        "pandas"
+    ],
+    "measuring_efficiency.py": [
+        "etl.loader",
+        "pandas"
+    ],
+    "metadata.py": [],
+    "snp.py": [
+        "etl.loader",
+        "pandas"
+    ],
+    "config.py": [
+        "pathlib"
+    ],
+    "files.py": [
+        "pandas",
+        "pathlib"
+    ],
+    "logging.py": [
+        "logging"
+    ],
+    "stats.py": [
+        "pandas"
+    ]
+}
