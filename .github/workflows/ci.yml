@@ -44,3 +44,5 @@ jobs:
 
       - name: Build API Docker Image
         run: docker build -f Dockerfile.api -t poshan-api .
+      - name: Build API Docker Image
+        run: docker build -f Dockerfile.api -t  poshan-api
