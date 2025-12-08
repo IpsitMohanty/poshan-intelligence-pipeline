@@ -1,0 +1,34 @@
+version: "3.9"
+
+services:
+
+  etl:
+    build:
+      context: .
+      dockerfile: Dockerfile.etl
+    volumes:
+      - ./warehouse:/warehouse
+      - ./data:/app/data
+    restart: "no"
+
+  cube:
+    build:
+      context: .
+      dockerfile: Dockerfile.cube
+    volumes:
+      - ./warehouse:/warehouse
+    depends_on:
+      - etl
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./warehouse:/warehouse
+    depends_on:
+      - cube
+    restart: always
