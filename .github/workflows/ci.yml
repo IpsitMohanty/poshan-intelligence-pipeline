@@ -37,7 +37,7 @@ jobs:
 
 
       - name: Run Tests
-        run: pytest || echo "No tests found"
+        run: pytest -v
         
       - name: Build ETL Docker Image
         run: docker build -f Dockerfile.etl -t poshan-etl .
