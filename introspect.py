@@ -1,6 +1,7 @@
 import os
 import ast
 from pathlib import Path
+from typing import Any
 import json
 
 PROJECT_ROOT = Path(__file__).parent
@@ -39,8 +40,8 @@ def analyze_python_file(file_path):
 
 
 def scan_project(root: Path):
-    project_info = {}
-    dependency_graph = {}
+    project_info: dict[str, Any] = {}
+    dependency_graph: dict[str, Any] = {}
 
     for path, dirs, files in os.walk(root):
         folder = Path(path)

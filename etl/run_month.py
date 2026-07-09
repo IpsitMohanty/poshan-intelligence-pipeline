@@ -7,7 +7,7 @@ from etl.cleaner import clean_all
 
 # Optional metadata step — safe fallback if file or function does not exist
 try:
-    from etl.metadata import enrich_metadata
+    from etl.metadata import enrich_metadata  # type: ignore[attr-defined]
     USE_METADATA = True
 except Exception:
     USE_METADATA = False
