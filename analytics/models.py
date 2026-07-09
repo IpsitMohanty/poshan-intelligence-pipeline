@@ -5,8 +5,16 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import r2_score, mean_absolute_error
 
+MIN_TRAINING_ROWS = 10
+
+
 def _train_model(df: pd.DataFrame, feature_cols: list, target_col: str):
     data = df.dropna(subset=feature_cols + [target_col]).copy()
+    if len(data) < MIN_TRAINING_ROWS:
+        raise ValueError(
+            f"Insufficient data to train model for {target_col}: "
+            f"need at least {MIN_TRAINING_ROWS} rows, got {len(data)}."
+        )
     X = data[feature_cols]
     y = data[target_col]
 

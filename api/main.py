@@ -1,5 +1,7 @@
 # api/main.py
 
+from typing import Any
+
 from fastapi import FastAPI, HTTPException
 import joblib
 import pandas as pd
@@ -186,7 +188,7 @@ def district_insights(name: str):
     row = matches.iloc[0].to_dict()
 
     # ⭐ FIX: Convert all values into JSON-safe types
-    clean_row = {}
+    clean_row: dict[str, Any] = {}
     for key, value in row.items():
         if pd.isna(value):
             clean_row[key] = None
