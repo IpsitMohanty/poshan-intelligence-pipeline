@@ -2,131 +2,27 @@
 
 [![CI](https://github.com/IpsitMohanty/poshan-intelligence-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/IpsitMohanty/poshan-intelligence-pipeline/actions/workflows/ci.yml)
 
-Multi-stage **Poshan / AWC analytics pipeline** that combines ETL, district-level cube generation, correlation analysis, basic predictive modeling, FastAPI endpoints, and analytical visuals.
+An ETL and analytics pipeline over monthly Anganwadi Centre (AWC) and Poshan reporting data: ten source-specific transformation modules feed a district-level cube, which in turn supports correlation analysis, lightweight predictive models, and a FastAPI serving layer.
 
-This repository is structured as a local intelligence workflow over operational nutrition and Anganwadi reporting data rather than a single notebook or one-off script.
+This is the data-engineering piece of a broader set of projects built on the same public-sector Poshan/AWC domain -- a real, multi-stage warehouse pipeline (extract from monthly CSVs, clean and harmonize, build a reconciled district cube, model and serve), not a single notebook or one-off script.
 
-## What This Project Does
+## Problem
 
-The project builds a district-level analytical layer from multiple operational CSV sources and supports several downstream uses.
+Monthly AWC reporting arrives as ten separately-formatted CSV exports (growth monitoring, anaemia, low birth weight, home visits, and so on), each with its own column naming and occasional gaps in district coverage. Turning that into one district-level analytical layer -- reliably, every month, without silently dropping or fabricating missing data -- is the actual engineering problem; the correlation analysis, prediction, and API layers downstream all depend on that layer being trustworthy.
 
-It includes:
+## Approach
 
-- ETL modules for multiple Poshan / AWC reporting streams
-- district-level cube generation from monthly source data
-- correlation analysis over operational and nutrition indicators
-- simple predictive modeling for measures such as low birth weight and stunting
-- a FastAPI layer for serving model and district insights
-- chart and BI subset generation for analytical review
-
-## Architecture
-
-Monthly source CSVs -> ETL modules -> district cube -> analytics / models / visuals -> API and analytical outputs
-
-## Repository Structure
-
-- `etl/`
-  Source-specific transformation logic for reporting streams such as adolescent girls, anaemia, AWC summary, home visits, LBW, measuring efficiency, SNP, and related modules.
-
-- `cubes/`
-  District cube construction logic and generated district-level cube outputs.
-
-- `analytics/`
-  Correlation, visualization, and model helper modules.
-
-- `api/`
-  FastAPI app and request schemas for model predictions and district insights.
-
-- `models/`
-  Serialized trained model artifacts.
-
-- `plots/`
-  Exported analytical charts such as top/bottom bars, scatter plots, and correlation heatmaps.
-
-- `data/`
-  Local monthly source data folders used by the ETL and cube-building steps.
-
-## Main Files
-
-- `main.py`
-  Builds the district cube from a monthly data folder and exports it to CSV.
-
-- `models_runner.py`
-  Loads the latest cube, trains or runs model workflows, and saves predictions / model outputs.
-
-- `correlate.py`
-  Runs correlation reporting.
-
-- `visuals.py`
-  Generates visual outputs and BI subsets.
-
-- `docker-compose.yml`
-  Multi-service container orchestration for the project components.
-
-- `Dockerfile.api`
-  API container definition.
-
-- `Dockerfile.etl`
-  ETL container definition.
-
-- `Dockerfile.cube`
-  Cube-generation container definition.
-
-## Example Outputs
-
-The repository currently contains outputs such as:
-
-- district cube CSVs
-- BI subset CSVs
-- correlation pair reports
-- exported plots
-- saved model artifacts
-
-## Tech Stack
-
-- Python
-- Pandas
-- scikit-learn
-- FastAPI
-- Uvicorn
-- Joblib
-- Matplotlib
-- Seaborn
-- Docker / Docker Compose
-
-## Testing
-
-The project includes a pytest suite covering three areas:
-
-**`tests/test_utils.py`** — unit tests for pure utility functions
-- `standardize_columns`: whitespace stripping, lowercase, special-char removal
-- `normalize_awc_code`: left-pads codes to 11 digits
-- `fill_missing`: zero, ffill, and unknown strategy behaviour
-- `safe_corr`: matrix shape, diagonal identity, sign correctness
-- `top_bottom`: correct boundary values for n-largest / n-smallest
-
-**`tests/test_models.py`** — trains `predict_lbw` and `predict_stunting` on synthetic district data
-- Verifies a `RandomForestRegressor` is returned and predictions are finite
-- Checks that missing feature columns are handled gracefully (filtered at training time)
-- Confirms feature importances sum to 1.0
-- Asserts that insufficient data raises rather than silently misfitting
-
-**`tests/test_api.py`** — FastAPI endpoint tests via `TestClient` with mocked `joblib.load` and `pandas.read_csv` (no model files required)
-- `GET /` returns 200
-- `POST /predict/lbw` and `POST /predict/stunting` return floats
-- `POST /predict/lbw` with no valid features returns 400
-- `GET /district/{name}` returns 200 for a known district and 404 for an unknown one
-- `GET /district_structured/{name}` response contains all expected top-level keys
-
-Run the suite with:
-
-```bash
-pytest -v
+```
+Monthly source CSVs -> ETL modules (per-source cleaning) -> district cube (left-merge on district) -> analytics / models / visuals -> API
 ```
 
-CI runs tests on every push to `main` and fails the build if any test fails.
+- `etl/` -- one module per reporting stream (adolescent girls, anaemia, AWC summary, home visits, low birth weight, growth monitoring 0-5 and 5-6, gestational weight gain, measuring efficiency, SNP), each normalizing its own source's column names into a clean, district-keyed table.
+- `cubes/district_cube.py` -- merges all ten cleaned tables into one district cube via a left join anchored on the growth-monitoring (5-6 years) table, so that table's row count and district coverage survives the merge regardless of what the other nine sources contain.
+- `analytics/` -- correlation analysis and lightweight prediction (`predict_lbw`, `predict_stunting`) over the cube.
+- `api/` -- FastAPI endpoints serving model predictions and district-level insight, with request/response schemas.
+- `models/` -- serialized model artifacts from `models_runner.py`.
 
-## Running Locally
+## Running it
 
 Install dependencies:
 
@@ -140,39 +36,62 @@ Build the district cube:
 python main.py
 ```
 
-Run correlation analysis:
+Run correlation analysis, generate visuals, or serve the API:
 
 ```bash
 python correlate.py
-```
-
-Generate visuals:
-
-```bash
 python visuals.py
-```
-
-Run the API:
-
-```bash
 uvicorn api.main:app --reload
 ```
 
+Containerized runs are available via `Dockerfile.api`, `Dockerfile.etl`, `Dockerfile.cube`, and `docker-compose.yml`.
+
+## Tests
+
+```bash
+pip install -r requirements.txt pytest httpx2
+pytest -v
+```
+
+44 tests. Coverage spans:
+
+- **`tests/test_utils.py`** -- pure utility functions (`standardize_columns`, `normalize_awc_code`, `fill_missing`, `safe_corr`, `top_bottom`).
+- **`tests/test_etl_cleaner.py`** -- the generic loader-stage cleaning pass (`etl/cleaner.py`): column standardization, whitespace stripping, duplicate-row dropping, and that it doesn't mutate its input.
+- **`tests/test_district_cube.py`** -- district-name normalization and the actual ten-table merge, checked against both a synthetic input and the real committed `data/2025-11` source files (see Results below).
+- **`tests/test_models.py`** -- `predict_lbw` / `predict_stunting` return a fitted `RandomForestRegressor`, produce finite predictions, handle missing feature columns, and raise on insufficient data rather than silently misfitting.
+- **`tests/test_api.py`** -- FastAPI endpoints via `TestClient`, with `joblib.load` / `pandas.read_csv` mocked so no model files are required to run the suite.
+
+CI runs the suite (plus flake8, mypy, and a Docker build for each of the three images) on every push to `main`.
+
+## Results: data-quality reconciliation
+
+For an ETL/warehouse pipeline, "evaluation" means checking that the merge didn't silently lose or fabricate data -- not an ML metric. These numbers come from `tests/test_district_cube.py` running the real cube build against the committed `data/2025-11` source files (30 Odisha districts), not a synthetic example:
+
+| check | result |
+|---|---|
+| Row count after merge | 30 -- matches the growth-monitoring (5-6 years) base table exactly, as a left join guarantees |
+| Duplicate district keys | 0 |
+| Null join keys | 0 |
+| Rebuild determinism | Identical output across two runs on the same input, checked directly |
+| Per-source district coverage | 9 of 10 sources cover all 30 districts this month |
+
+**The one real gap, reported rather than hidden**: the Adolescent Girls (14-18 years) source covers only 10 of the 30 districts this month -- the other 20 districts' `ag_*` columns are correctly `NaN` after the left join, not zero-filled or dropped. `tests/test_district_cube.py::test_adolescent_girls_coverage_gap_matches_documented_value` pins this exact count (20) so a future month's data, or a change to the merge logic, that alters it gets caught rather than silently drifting.
+
+## Limitations
+
+- Reconciliation was checked against one month of real data (November 2025), not a multi-month history -- month-to-month stability of these numbers (e.g. whether the Adolescent Girls gap recurs, worsens, or is specific to this month) isn't measured here.
+- The Adolescent Girls coverage gap is reported, not root-caused: whether it reflects a genuine reporting gap at those 20 districts, a filename/format mismatch in the source export, or something else in the ten-source pipeline isn't investigated in this pass.
+- Test coverage is real but uneven across the pipeline: the shared cleaning utilities, the district-cube merge, the prediction models, and the API layer are all covered; the ten individual per-source `etl/` transformation modules (`adolescent_girls.py`, `anaemia.py`, etc.) are exercised indirectly through the cube-build integration test, not with dedicated unit tests each.
+- `predict_lbw` / `predict_stunting` are lightweight `RandomForestRegressor` fits over the district cube, not tuned or validated against a held-out period -- the tests confirm the models fit and predict without crashing, not that their predictions are accurate.
+
 ## Container Setup
 
-The repository includes:
-
-- `Dockerfile.api`
-- `Dockerfile.etl`
-- `Dockerfile.cube`
-- `docker-compose.yml`
-
-These support containerized runs for the API and pipeline components.
+`Dockerfile.api`, `Dockerfile.etl`, `Dockerfile.cube`, and `docker-compose.yml` support containerized runs of each pipeline component; CI builds all three images on every push.
 
 ## Data Notes
 
-The workflow expects monthly local source CSV files organized by month folders and uses file paths / outputs built around local execution.
+The workflow expects monthly local source CSV files organized by month folders (`data/YYYY-MM/`) and produces cube/warehouse outputs keyed to that same month tag.
 
 ## Project Scope
 
-This repository is focused on ETL-driven Poshan analytics, district cube generation, model experimentation, and lightweight API exposure over operational datasets.
+ETL-driven Poshan analytics over public-scale AWC reporting data: district cube generation, correlation analysis, lightweight predictive modeling, and a FastAPI serving layer over the result.
