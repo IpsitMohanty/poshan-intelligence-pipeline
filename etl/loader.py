@@ -1,5 +1,5 @@
+import os
 import pandas as pd
-import os   # ← ADD THIS
 
 def load_file(path: str):
     ext = os.path.splitext(path)[1].lower()
