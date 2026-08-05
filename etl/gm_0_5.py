@@ -16,6 +16,14 @@ def analyze_gm_0_5(path: str) -> pd.DataFrame:
                   .str.replace("__", "_")
     )
 
+    # Drop the state-level "Total" rollup row some monthly exports append
+    # after the last district. It isn't a district, and left unfiltered it
+    # would carry a real district's worth of look-alike data into any
+    # downstream step that iterates district values directly (this table's
+    # row is otherwise harmless today only because district_cube.py's left
+    # join happens to be anchored on a different, Total-free source table).
+    df = df[~df["district"].astype(str).str.strip().str.lower().eq("total")]
+
     # Rename to consistent internal names
     df = df.rename(columns={
         "district": "district",
