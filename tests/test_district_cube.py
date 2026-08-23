@@ -4,12 +4,17 @@ build_district_cube (the actual 10-table left-merge that produces the
 district cube). Previously untested despite being the pipeline's
 central join.
 
-TestBuildDistrictCubeAgainstRealNovemberData runs against the actual
-committed data/2025-11 source files, not a synthetic fixture -- these
-are the real, reproducible reconciliation numbers quoted in the
-README's data-quality section, not illustrative placeholders. No
-network, no external dependency: the source CSVs are already in the
-repo.
+TestBuildDistrictCubeAgainstCommittedNovemberData runs against the
+actual committed data/2025-11 source files, not an inline fixture --
+these are the real, reproducible reconciliation numbers quoted in the
+README's data-quality section, not illustrative placeholders. As of the
+synthetic-data migration, data/2025-11 holds seeded synthetic data (see
+scripts/generate_synthetic_data.py and the README's Synthetic Data
+Provenance section), not real government figures -- the structural
+properties these tests check (row counts, join-key integrity, the
+Adolescent Girls coverage gap) are still real properties of that
+committed file, just no longer real-world figures. No network, no
+external dependency: the source CSVs are already in the repo.
 """
 import pandas as pd
 import pytest
@@ -48,7 +53,7 @@ class TestCleanDistrict:
         assert "-" in result["district"].iloc[0]
 
 
-class TestBuildDistrictCubeAgainstRealNovemberData:
+class TestBuildDistrictCubeAgainstCommittedNovemberData:
     def test_one_row_per_district_no_duplicates(self, cube):
         assert cube["district"].duplicated().sum() == 0
 
