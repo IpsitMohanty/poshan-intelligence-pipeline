@@ -1,6 +1,10 @@
+from pathlib import Path
+
 from cubes.district_cube import build_district_cube
 
-folder = r"D:\poshan_intelligence\data\2025-11"
+# Repo-relative, not a machine-specific absolute path (this used to be
+# hardcoded to a path that only ever existed on one dev machine).
+folder = str(Path(__file__).resolve().parent / "data" / "2025-11")
 
 cube = build_district_cube(folder)
 

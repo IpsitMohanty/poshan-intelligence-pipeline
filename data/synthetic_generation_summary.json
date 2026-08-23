@@ -1,0 +1,23 @@
+{
+  "generator": "generate_synthetic_data",
+  "seed": 42,
+  "output_dir": "/mnt/d/IBM projects/poshan-intelligence-pipeline/data/2025-11",
+  "month": "2025-11",
+  "district_count": 30,
+  "ag_covered_districts": [
+    "Bamipada",
+    "Bisukhand",
+    "Dhorukot",
+    "Hatabandha",
+    "Jabibandha",
+    "Kabipur",
+    "Kivagarh",
+    "Mahapada",
+    "Majagarh",
+    "Nobipur"
+  ],
+  "ag_coverage_fraction": 0.3333,
+  "row_anomaly_rate_target": 0.02,
+  "row_anomaly_count": 1,
+  "files_written": 13
+}

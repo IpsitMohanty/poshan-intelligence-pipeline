@@ -48,32 +48,32 @@ def _train_model(df: pd.DataFrame, feature_cols: list, target_col: str):
 
 def predict_lbw(df: pd.DataFrame):
     """
-    Predict LBW_Rate_% using maternal & service indicators.
+    Predict lbw_rate_pct using maternal & service indicators.
     Adjust feature list based on actual cube columns.
     """
     features = [
-        "PW_Anaemia_Rate",
-        "Optimum_WG_Latest_%",
-        "PW_Hb_Measured_%",
-        "Measurement_Efficiency",
-        "HV_Percentage",
-        "SAM_Rate_%",
-        "SUW_Rate_%",
+        "pw_anaemia_rate",
+        "optimum_wg_latest_pct",
+        "pw_hb_measured_pct",
+        "measurement_efficiency",
+        "visit_coverage_pct",
+        "sam_ratio",
+        "suw_ratio",
     ]
     features = [c for c in features if c in df.columns]
-    return _train_model(df, features, "LBW_Rate_%")
+    return _train_model(df, features, "lbw_rate_pct")
 
 def predict_stunting(df: pd.DataFrame):
     """
-    Predict Stunting_Total_% from SNP, ME, AWC, etc.
+    Predict stunting_total_pct from SNP, ME, AWC, etc.
     """
     features = [
-        "Measurement_Efficiency",
-        "SAM_Rate_%",
-        "SUW_Rate_%",
-        "Active_AWC_%",
-        "HV_Percentage",
-        "LBW_Rate_%",
+        "measurement_efficiency",
+        "sam_ratio",
+        "suw_ratio",
+        "active_awc_pct",
+        "visit_coverage_pct",
+        "lbw_rate_pct",
     ]
     features = [c for c in features if c in df.columns]
-    return _train_model(df, features, "Stunting_Total_%")
+    return _train_model(df, features, "stunting_total_pct")
