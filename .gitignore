@@ -1,2 +1,23 @@
 __pycache__/
 *.pyc
+
+# --- Real government data (must never be committed; see README) ---
+# Monthly source-report folders, e.g. data/2025-11/. Does NOT match
+# data/missingness_profile.json, which is derived structural metadata
+# (column names, blank/coverage rates, district name lists) with no real
+# counts or figures, and is intentionally committed for the synthetic
+# generator to consume.
+data/[0-9][0-9][0-9][0-9]-[0-9][0-9]/
+# Real-data ETL output / warehouse, entirely derived from the above.
+warehouse/
+# Derived prediction CSVs (cube code itself, cubes/*.py, stays tracked).
+cubes/*.csv
+# Models trained on real government data.
+models/*.joblib
+models/*.pkl
+# Charts rendered from real data.
+plots/
+# Root-level real-data snapshots and derived stats.
+bi_subset_*.csv
+district_cube_*.csv
+correlation_pairs.csv

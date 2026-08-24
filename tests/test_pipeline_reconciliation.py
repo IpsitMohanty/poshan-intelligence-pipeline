@@ -8,8 +8,10 @@ tests/test_district_cube.py's cube-merge tests. Three concerns:
 
 2. Referential integrity of the "district" join key across all ten
    cube-input sources -- every value, after the same clean_district()
-   normalization the cube build applies, must be one of the 30 real Odisha
-   districts. This caught a real bug: the raw 0-5-years growth-monitoring
+   normalization the cube build applies, must be one of the 30 canonical
+   districts for this dataset (read from the committed AWC source, not
+   hardcoded - works whether that source holds real or synthetic district
+   names). This caught a real bug: the raw 0-5-years growth-monitoring
    export appends a state-level "Total" rollup row that isn't a district
    (fixed in etl/gm_0_5.py; this test pins the fix so it can't regress).
    It was harmless to the committed cube only by accident -- the merge
@@ -22,9 +24,13 @@ tests/test_district_cube.py's cube-merge tests. Three concerns:
    build_district_cube("data/2025-11") run, or has the checked-in cube
    artifact drifted from the source data it's supposed to represent?
 
-All three run against the real committed data/2025-11 and warehouse/
-files, same convention as test_district_cube.py -- no synthetic fixture,
-no network.
+All three run against the committed data/2025-11 and warehouse/ files,
+same convention as test_district_cube.py -- no inline fixture, no
+network. As of the synthetic-data migration those files hold seeded
+synthetic data (scripts/generate_synthetic_data.py), not real
+government figures; the structural properties checked here (row-count
+reconciliation, referential integrity, cube-to-source consistency) hold
+regardless of whether the underlying figures are real or synthetic.
 """
 import os
 
@@ -71,8 +77,11 @@ SOURCES = {
 
 @pytest.fixture(scope="module")
 def canonical_districts():
-    """The 30 real Odisha districts, taken from the AWC summary source --
-    the one table of the ten with no rollup/aggregate row of any kind."""
+    """The 30 canonical districts for this dataset, taken from the AWC
+    summary source (the one table of the ten with no rollup/aggregate row
+    of any kind) rather than hardcoded - so this fixture works whether
+    that source holds real Odisha district names or the synthetic
+    generator's fictional ones."""
     awc = clean_district(analyze_awc_summary(f"{DATA_DIR}/AWC_11_2025.csv"))
     return set(awc["district"])
 
@@ -95,9 +104,9 @@ class TestRawToWarehouseRowCountReconciliation:
 
 
 class TestReferentialIntegrity:
-    """Every district-keyed cube input must resolve entirely to the 30 real
-    districts after clean_district() -- no aggregate rows, typos, or blank
-    values silently riding along into the merge."""
+    """Every district-keyed cube input must resolve entirely to the 30
+    canonical districts after clean_district() -- no aggregate rows,
+    typos, or blank values silently riding along into the merge."""
 
     @pytest.mark.parametrize("key", sorted(SOURCES))
     def test_all_district_values_are_real_districts(self, key, canonical_districts):

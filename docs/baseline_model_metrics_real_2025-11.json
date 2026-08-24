@@ -1,0 +1,60 @@
+{
+  "provenance": "real",
+  "source": "data/2025-11 (real government data, pre-Phase-2-purge)",
+  "captured_at_utc": "2026-08-23T12:08:55.469788+00:00",
+  "note": "Aggregate model-quality metrics only (R2, MAE, per-feature importance weights, row counts) - no district names, no per-district predictions, no raw indicator values. Captured once against real ground truth as a baseline before the repo's data/ and models/ were regenerated from the synthetic generator, so there is a real-data reference point for comparison even after the real data itself is purged from history.",
+  "cube_shape": [
+    30,
+    153
+  ],
+  "models": {
+    "lbw": {
+      "target": "lbw_rate_pct",
+      "n_rows_total": 30,
+      "n_test_rows": 9,
+      "features": [
+        "pw_anaemia_rate",
+        "optimum_wg_latest_pct",
+        "pw_hb_measured_pct",
+        "measurement_efficiency",
+        "visit_coverage_pct",
+        "sam_ratio",
+        "suw_ratio"
+      ],
+      "r2": -0.1916,
+      "mae": 0.027,
+      "feature_importances": {
+        "pw_anaemia_rate": 0.3176,
+        "optimum_wg_latest_pct": 0.0666,
+        "pw_hb_measured_pct": 0.0476,
+        "measurement_efficiency": 0.0667,
+        "visit_coverage_pct": 0.298,
+        "sam_ratio": 0.0686,
+        "suw_ratio": 0.1348
+      }
+    },
+    "stunting": {
+      "target": "stunting_total_pct",
+      "n_rows_total": 30,
+      "n_test_rows": 9,
+      "features": [
+        "measurement_efficiency",
+        "sam_ratio",
+        "suw_ratio",
+        "active_awc_pct",
+        "visit_coverage_pct",
+        "lbw_rate_pct"
+      ],
+      "r2": 0.883,
+      "mae": 1.3871,
+      "feature_importances": {
+        "measurement_efficiency": 0.0348,
+        "sam_ratio": 0.0256,
+        "suw_ratio": 0.8622,
+        "active_awc_pct": 0.0009,
+        "visit_coverage_pct": 0.0172,
+        "lbw_rate_pct": 0.0592
+      }
+    }
+  }
+}

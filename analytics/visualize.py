@@ -30,24 +30,24 @@ def plot_top_bottom_bar(df: pd.DataFrame, column: str, n: int = 5):
         print(f"[ERROR] Column '{column}' not found, skipping top/bottom…")
         return
 
-    df_plot = df[["District", column]].dropna()
+    df_plot = df[["district", column]].dropna()
 
     top = df_plot.nlargest(n, column)
     bottom = df_plot.nsmallest(n, column)
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
-    axes[0].barh(top["District"], top[column])
+    axes[0].barh(top["district"], top[column])
     axes[0].set_title(f"Top {n} districts – {column}")
     axes[0].invert_yaxis()
 
-    axes[1].barh(bottom["District"], bottom[column])
+    axes[1].barh(bottom["district"], bottom[column])
     axes[1].set_title(f"Bottom {n} districts – {column}")
     axes[1].invert_yaxis()
 
     plt.tight_layout()
 
-    filename = f"top_bottom_{column.replace('%','pct')}.png"
+    filename = f"top_bottom_{column.replace('%', 'pct')}.png"
     file_path = os.path.join(PLOT_DIR, filename)
     plt.savefig(file_path, dpi=240, bbox_inches="tight")
     plt.close()
@@ -65,14 +65,14 @@ def plot_scatter(df: pd.DataFrame, x_col: str, y_col: str):
             print(f"[ERROR] Missing column '{col}', skipping scatter plot…")
             return
 
-    df_plot = df[[x_col, y_col, "District"]].dropna()
+    df_plot = df[[x_col, y_col, "district"]].dropna()
 
     plt.figure(figsize=(7, 7))
     plt.scatter(df_plot[x_col], df_plot[y_col])
 
     # label each point
     for _, row in df_plot.iterrows():
-        plt.text(row[x_col], row[y_col], row["District"], fontsize=6)
+        plt.text(row[x_col], row[y_col], row["district"], fontsize=6)
 
     plt.xlabel(x_col)
     plt.ylabel(y_col)
@@ -124,32 +124,32 @@ def export_bi_subset(df: pd.DataFrame, out_path: str):
     print(f"[DEBUG] Exporting BI subset → {out_path}")
 
     cols = [
-        "District",
+        "district",
 
         # GM 5–6
-        "Stunting_Total_%",
-        "Underweight_Total_%",
-        "Measurement_Efficiency",
-        "Measurement_Coverage_%",
+        "stunting_total_pct",
+        "underweight_total_pct",
+        "measurement_efficiency",
+        "measurement_coverage_pct_x",
 
         # GM 0–5
-        "Stunting_Total_Pct_0_5",
-        "Underweight_Total_Pct_0_5",
-        "Measurement_Coverage_Pct_0_5",
+        "stunting_total_pct_0_5",
+        "underweight_total_pct_0_5",
+        "measurement_coverage_pct_0_5",
 
         # Anaemia → LBW → AG
-        "LBW_Rate_%",
-        "PW_Anaemia_Rate",
-        "AG_Anaemia_%",
-        "Optimum_WG_Latest_%",
+        "lbw_rate_pct",
+        "pw_anaemia_rate",
+        "ag_anaemia_rate",
+        "optimum_wg_latest_pct",
 
         # Service Delivery
-        "HV_Percentage",
-        "Active_AWC_%",
+        "visit_coverage_pct",
+        "active_awc_pct",
 
         # Severe Cases
-        "SAM_Rate_%",
-        "SUW_Rate_%"
+        "sam_ratio",
+        "suw_ratio"
     ]
 
     existing = [c for c in cols if c in df.columns]

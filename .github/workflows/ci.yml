@@ -35,6 +35,23 @@ jobs:
       - name: Type Check (mypy)
         run: mypy --ignore-missing-imports --exclude "main.py" .
 
+      - name: Generate synthetic data
+        # data/2025-11 (and everything derived from it) is real-data-shaped
+        # but gitignored - real data is never committed, so a clean
+        # checkout has no data/ at all. Regenerating from the seeded
+        # generator here, in a clean environment, on every run, is also
+        # the byte-reproducibility proof: if this seed ever stopped
+        # producing identical output, CI would be the first to know.
+        run: python scripts/generate_synthetic_data.py --seed 42
+
+      - name: Build warehouse (ETL + cube)
+        # warehouse/ is gitignored too - tests/test_pipeline_reconciliation.py
+        # checks the synthetic data/2025-11 above against a warehouse built
+        # from it, same as it always checked the real data against the real
+        # warehouse.
+        run: |
+          python -m etl.run_month
+          python -m cubes.run_cube
 
       - name: Run Tests
         run: pytest -v
