@@ -88,9 +88,9 @@ def profile_file(path: Path) -> dict:
         numeric = pd.to_numeric(series, errors="coerce")
         n_numeric_parseable = int(numeric.notna().sum())
         all_zero_suspect = bool(
-            n_numeric_parseable > 0
-            and n_numeric_parseable == n_rows
-            and (numeric.fillna(-1) == 0).all()
+            n_numeric_parseable > 0 and
+            n_numeric_parseable == n_rows and
+            (numeric.fillna(-1) == 0).all()
         )
 
         columns[col] = {

@@ -47,7 +47,7 @@ def plot_top_bottom_bar(df: pd.DataFrame, column: str, n: int = 5):
 
     plt.tight_layout()
 
-    filename = f"top_bottom_{column.replace('%','pct')}.png"
+    filename = f"top_bottom_{column.replace('%', 'pct')}.png"
     file_path = os.path.join(PLOT_DIR, filename)
     plt.savefig(file_path, dpi=240, bbox_inches="tight")
     plt.close()

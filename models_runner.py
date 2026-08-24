@@ -54,7 +54,7 @@ def save_predictions(df: pd.DataFrame, cube_name: str):
     Path("cubes").mkdir(exist_ok=True)  # ensure folder exists
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-    output_name = f"predictions_{cube_name.replace('.csv','')}_{timestamp}.csv"
+    output_name = f"predictions_{cube_name.replace('.csv', '')}_{timestamp}.csv"
     output_path = Path("cubes") / output_name
 
     df.to_csv(output_path, index=False)

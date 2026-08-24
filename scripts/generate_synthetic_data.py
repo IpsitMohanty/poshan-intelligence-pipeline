@@ -115,7 +115,7 @@ def clamp(v, lo, hi):
 
 def unique_district_names(rng: random.Random, n: int) -> list:
     names = set()
-    out = []
+    out: list = []
     tries = 0
     while len(out) < n:
         tries += 1
@@ -700,7 +700,6 @@ def write_gm_0_5(rows, totals, out_path: Path):
     for r in rows:
         values = [str(r[c]) for c in GM_0_5_COLUMNS[:-1]] + [str(r["__second_reference_data_not_found__"])]
         lines.append(",".join(values))
-    total_row = [str(totals.get(c, "") if c != "District" else "Total") for c in GM_0_5_COLUMNS]
     # totals dict doesn't carry percentages; recompute footer percentages
     # from footer counts, matching how the real Total row is itself a
     # genuine re-aggregation, not a re-sum-of-percentages.
@@ -785,9 +784,10 @@ def main():
     anomaly_log = []
 
     awc_rows = build_awc_rows(districts)
-    write_csv(awc_rows, ["District", "Total AWC", "Total Active AWC", "Total Inactive AWC",
-                          "Newly Added AWC during Month", "Inactive AWC during Month"],
-              output_dir / "AWC_11_2025.csv")
+    write_csv(awc_rows, [
+        "District", "Total AWC", "Total Active AWC", "Total Inactive AWC",
+        "Newly Added AWC during Month", "Inactive AWC during Month",
+    ], output_dir / "AWC_11_2025.csv")
 
     awc_staff_rows = build_awc_staff_rows(districts, rng)
     write_csv(awc_staff_rows, ["District", "Total AWC Operational", "AWW", "AWW on Additional Charges", "AWH"],
@@ -832,9 +832,10 @@ def main():
               output_dir / "Low_Birth_Weight_11_2025.csv")
 
     me_rows = build_measuring_efficiency_rows(districts, rng, anomaly_log)
-    write_csv(me_rows, ["District", "Total Active Children", "Total Active Children Measured",
-                         "% Children Measured", "AWW Completed 80% of ME"],
-              output_dir / "Measuring_Efficiency_Children_0_to_6_years_11_2025.csv")
+    write_csv(me_rows, [
+        "District", "Total Active Children", "Total Active Children Measured",
+        "% Children Measured", "AWW Completed 80% of ME",
+    ], output_dir / "Measuring_Efficiency_Children_0_to_6_years_11_2025.csv")
 
     snp_rows = build_snp_rows(districts, rng)
     write_csv(snp_rows, [
@@ -846,9 +847,10 @@ def main():
     ], output_dir / "SNP_Projections_12_2025.csv")
 
     vhsnd_rows = build_vhsnd_rows(districts, rng)
-    write_csv(vhsnd_rows, ["District", "Total AWC", "Total CBE", "Total VHSND",
-                            "Field Functionaries", "Total Participants", "Vaccinations"],
-              output_dir / "VHSND_and_CBE_11_2025.csv")
+    write_csv(vhsnd_rows, [
+        "District", "Total AWC", "Total CBE", "Total VHSND",
+        "Field Functionaries", "Total Participants", "Vaccinations",
+    ], output_dir / "VHSND_and_CBE_11_2025.csv")
 
     me_status_rows = build_measurement_efficiency_status_rows(gm_0_5_totals, gm_5_6_rows, rng)
     write_measurement_efficiency_status(me_status_rows, output_dir / "Measurement_Efficiency_Status_11_2025 (1).csv")
