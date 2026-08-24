@@ -20,7 +20,7 @@ Monthly source CSVs -> ETL modules (per-source cleaning) -> district cube (left-
 
 - `etl/` -- one module per reporting stream (adolescent girls, anaemia, AWC summary, home visits, low birth weight, growth monitoring 0-5 and 5-6, gestational weight gain, measuring efficiency, SNP), each normalizing its own source's column names into a clean, district-keyed table.
 - `cubes/district_cube.py` -- merges all ten cleaned tables into one district cube via a left join anchored on the growth-monitoring (5-6 years) table, so that table's row count and district coverage survives the merge regardless of what the other nine sources contain.
-- `analytics/` -- correlation analysis and lightweight prediction (`predict_lbw`, `predict_stunting`) over the cube.
+- `analytics/` -- correlation analysis over the cube, plus two `RandomForestRegressor` fits (`predict_lbw`, `predict_stunting`) kept in place and tested, but reported as findings rather than shipped predictors: LBW as a structured small-sample negative result, stunting as a leakage-checked correlation -- see [Model Layer Findings](#model-layer-findings).
 - `api/` -- FastAPI endpoints serving model predictions and district-level insight, with request/response schemas.
 - `models/` -- serialized model artifacts from `models_runner.py`.
 
@@ -104,12 +104,21 @@ For an ETL/warehouse pipeline, "evaluation" means checking that the merge didn't
 
 **Real-data reference point**: [`docs/baseline_model_metrics_real_2025-11.json`](docs/baseline_model_metrics_real_2025-11.json) holds one baseline capture of `predict_lbw` / `predict_stunting`'s R², MAE, and feature importances against the real November 2025 ground truth, taken immediately before the data was regenerated as synthetic. It contains aggregate metrics only -- no district names, no per-district predictions, no raw indicator values -- so it's safe to keep as a real-data comparison point through the eventual git-history purge of the real data itself.
 
+## Model Layer Findings
+
+`predict_lbw` and `predict_stunting` fit a `RandomForestRegressor` against a 30-district cross-section (21 train / 9 test rows, `test_size=0.3, random_state=42`) -- the ceiling on this pipeline's real data: every source report is pre-aggregated to district level before export (`SNP_Projections`' `Project`/`Sector`/`AWC` columns are per-district *counts*, not row-level microdata -- confirmed against the real data before it was regenerated as synthetic), and only one month (`2025-11`) has ever existed in this repository's history, so no district×month panel exists either. Both fits are kept in the codebase and covered by tests (`tests/test_models.py`, `tests/test_models_integration.py`) -- the tests confirm they fit and predict without crashing, not that they predict well. What they actually found, evaluated against a mean-predictor baseline and a single-feature linear fit on the same 9-row holdout:
+
+**LBW -- a structured negative result.** R² on the 9-row holdout: mean-predictor baseline -0.283, RandomForest (7 features) -0.192, single-feature linear on `pw_anaemia_rate` alone -0.157. The *ordering* is the finding, not just the sign: added model complexity doesn't buy predictive power here, it costs it -- the RandomForest sits between the trivial baseline and the simpler linear model, beaten by both the model above it in complexity and the one below. Recorded as a sample-size negative result, not cited as a working predictor.
+
+**Stunting -- a leakage-checked correlation, not a validated predictor.** R² on the same 9-row holdout: mean-predictor baseline -0.291, single-feature linear on `suw_ratio` (severely-underweight rate) alone 0.487, full RandomForest (6 features) 0.883. Verified this is not a pipeline data leak: `stunting_total_pct` is computed entirely from the Growth Monitoring (5-6 years) report (`etl/gm_5_6.py`), `suw_ratio` entirely from the SNP Projections report (`etl/snp.py`) -- two independent source files, no shared columns or formula. The correlation is real and stated plainly: severely-underweight rate is strongly associated with stunting rate across these 30 districts (R²≈0.49, linear, one feature), consistent with both indicators reflecting chronic undernutrition. The RandomForest's higher 0.883 is not treated as a stronger version of that same finding -- at n=30 with a 9-row test set, R² is too unstable to support a validated-predictor claim, independent of how clean the leakage check came back.
+
+Full methodology -- the baseline-comparison code, the leakage-check trace, the full-history grain/panel sweep -- in [`docs/model_layer_audit.md`](docs/model_layer_audit.md).
+
 ## Limitations
 
 - Reconciliation was checked against one month of data (November 2025 -- synthetic since the provenance migration, real before it), not a multi-month history -- month-to-month stability of these numbers (e.g. whether the Adolescent Girls gap recurs, worsens, or is specific to this month) isn't measured here, and the synthetic generator doesn't attempt to simulate it (see Synthetic Data Provenance).
 - The Adolescent Girls coverage gap is reported, not root-caused: whether it reflects a genuine reporting gap at those 20 districts, a filename/format mismatch in the source export, or something else in the ten-source pipeline isn't investigated in this pass.
 - Test coverage is real but uneven across the pipeline: the shared cleaning utilities, the district-cube merge, the prediction models, the API layer, and now each of the ten individual per-source `etl/` transformation modules' district-key output are all covered; the non-district-key columns those modules derive (e.g. the stunting/underweight ratios) are still only exercised indirectly through the cube-build integration test, not with dedicated per-column unit tests.
-- `predict_lbw` / `predict_stunting` are lightweight `RandomForestRegressor` fits over the district cube, not tuned or validated against a held-out period -- the tests confirm the models fit and predict without crashing, not that their predictions are accurate.
 
 ## Container Setup
 
