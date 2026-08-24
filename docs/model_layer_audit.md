@@ -42,7 +42,39 @@ Unlike LBW, this one clearly beats both trivial baselines. But look at where the
 
 Matches the hypothesis this audit was framed to test: **the model layer is honest small-sample exploration, not a validated ML capability** — one negative result (LBW) and one real-but-overstated correlation (stunting), both bounded by a 30-district cross-section that no algorithm swap fixes, confirmed to be the actual ceiling (no larger real grain, no panel) rather than an assumption. The pipeline's defensible, n=30-proof story is what it was already documented as: ETL correctness, warehouse reconciliation, referential integrity, and anomaly surveillance — none of which need a large N to be true.
 
-## Proposed README reframe (not applied — for review)
+## Proposed README reframe -- v2, revised per review (not applied)
+
+v1 (below the changelog note) flattened both models to one generic "small-sample exploration" label. Correction: LBW's finding is the RF<linear<mean *complexity-penalty ordering itself*, not just "negative R²" -- keep that structure explicit. Stunting's clean leakage check is a positive, stated result, not a parenthetical hedge. Both n=30/21-train/9-test numbers go directly in the README text, not just linked out to this doc.
+
+Replace the current `analytics/` bullet in **Approach**:
+
+> - `analytics/` -- correlation analysis and lightweight prediction (`predict_lbw`, `predict_stunting`) over the cube.
+
+with:
+
+> - `analytics/` -- correlation analysis over the cube, plus two `RandomForestRegressor` fits (`predict_lbw`, `predict_stunting`) kept in place and tested, but reported as findings rather than shipped predictors: LBW as a structured small-sample negative result, stunting as a leakage-checked correlation -- see [Model Layer Findings](#model-layer-findings).
+
+Replace the last **Limitations** bullet (the finding now lives in its own section, so this line is redundant rather than corrected):
+
+> - `predict_lbw` / `predict_stunting` are lightweight `RandomForestRegressor` fits over the district cube, not tuned or validated against a held-out period -- the tests confirm the models fit and predict without crashing, not that their predictions are accurate.
+
+with nothing -- removed, superseded by the new section below (placed after "Synthetic Data Provenance"):
+
+> ## Model Layer Findings
+>
+> `predict_lbw` and `predict_stunting` fit a `RandomForestRegressor` against a 30-district cross-section (21 train / 9 test rows, `test_size=0.3, random_state=42`) -- the ceiling on this pipeline's real data: every source report is pre-aggregated to district level before export (`SNP_Projections`' `Project`/`Sector`/`AWC` columns are per-district *counts*, not row-level microdata -- confirmed against the real data before it was regenerated as synthetic), and only one month (`2025-11`) has ever existed in this repository's history, so no district×month panel exists either. Both fits are kept in the codebase and covered by tests (`tests/test_models.py`, `tests/test_models_integration.py`) -- the tests confirm they fit and predict without crashing, not that they predict well. What they actually found, evaluated against a mean-predictor baseline and a single-feature linear fit on the same 9-row holdout:
+>
+> **LBW -- a structured negative result.** R² on the 9-row holdout: mean-predictor baseline -0.283, RandomForest (7 features) -0.192, single-feature linear on `pw_anaemia_rate` alone -0.157. The *ordering* is the finding, not just the sign: added model complexity doesn't buy predictive power here, it costs it -- the RandomForest sits between the trivial baseline and the simpler linear model, beaten by both the model above it in complexity and the one below. Recorded as a sample-size negative result, not cited as a working predictor.
+>
+> **Stunting -- a leakage-checked correlation, not a validated predictor.** R² on the same 9-row holdout: mean-predictor baseline -0.291, single-feature linear on `suw_ratio` (severely-underweight rate) alone 0.487, full RandomForest (6 features) 0.883. Verified this is not a pipeline data leak: `stunting_total_pct` is computed entirely from the Growth Monitoring (5-6 years) report (`etl/gm_5_6.py`), `suw_ratio` entirely from the SNP Projections report (`etl/snp.py`) -- two independent source files, no shared columns or formula. The correlation itself is real and worth stating plainly: severely-underweight rate is strongly associated with stunting rate across these 30 districts (R²≈0.49, linear, one feature), consistent with both indicators reflecting chronic undernutrition. The RandomForest's higher 0.883 is not treated as a stronger version of that same finding -- at n=30 with a 9-row test set, R² is too unstable to support a validated-predictor claim, independent of how clean the leakage check came back.
+>
+> Full methodology -- the baseline-comparison code, the leakage-check trace, the full-history grain/panel sweep -- in `docs/model_layer_audit.md`.
+
+And in **Results: data-quality reconciliation**'s intro, the parenthetical `("evaluation" means checking that the merge didn't silently lose or fabricate data -- not an ML metric)` already sets up this distinction well; no change needed there.
+
+---
+
+### v1 (superseded by the revision above; kept for record)
 
 Replace the current `analytics/` bullet in **Approach**:
 
@@ -66,5 +98,3 @@ with a new section (placed after "Synthetic Data Provenance"):
 > - **Stunting**: R²=0.88 looks strong, but a single feature (`suw_ratio`, severely-underweight rate) alone already gets R²=0.49 linearly, and the full result is measured on 9 held-out rows -- too unstable to call validated. Reframed as a **correlation finding**: severely-underweight rate is strongly associated with stunting rate across these districts, consistent with both indicators reflecting chronic undernutrition. Verified this isn't a pipeline data leak -- the two indicators come from separate source reports (`gm_5_6.py` vs `snp.py`) with no shared computation -- but a real sample size, not a leak, is why it still isn't a validated predictor.
 >
 > Both fits, and this framing, are exercised by `tests/test_models.py` and `tests/test_models_integration.py` -- the tests confirm the models fit and predict without crashing and pin the column-naming seam to `build_district_cube()`'s real output; they do not claim, and were never meant to claim, predictive accuracy. Full working (mean-baseline / single-feature-linear comparisons, the leakage check) in `docs/model_layer_audit.md`.
-
-And in **Results: data-quality reconciliation**'s intro, the parenthetical `("evaluation" means checking that the merge didn't silently lose or fabricate data -- not an ML metric)` already sets up this distinction well; no change needed there.
