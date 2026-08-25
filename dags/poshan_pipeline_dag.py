@@ -43,15 +43,21 @@ installed, not the project's own (much heavier, separately-versioned)
 dependency set. Task execution needs both; see Dockerfile.airflow.
 
 NAMING NOTE: this file lives in a top-level dags/ directory, not
-airflow/dags/ -- a top-level directory literally named "airflow" shadows
-the apache-airflow package itself as a Python 3 implicit namespace
-package whenever the repo root is on sys.path (which pytest, and this
-project's own PYTHONPATH convention via Dockerfile.airflow, both do),
-breaking `from airflow import DAG` in a confusing way (ImportError:
-cannot import name 'DAG' from 'airflow' (unknown location), not a clean
-ModuleNotFoundError) rather than failing straightforwardly. Caught by
-actually running tests/test_airflow_dag.py in the project's main
-environment during development, not assumed safe.
+airflow/dags/. It didn't start that way -- the first version of this DAG
+did live under a top-level airflow/ directory, and that was the actual,
+found-not-anticipated bug: a top-level directory literally named
+"airflow" shadows the apache-airflow package itself as a Python 3
+implicit namespace package whenever the repo root is on sys.path (which
+pytest, and this project's own PYTHONPATH convention via
+Dockerfile.airflow, both do). This surfaced as `from airflow import DAG`
+failing with `ImportError: cannot import name 'DAG' from 'airflow'
+(unknown location)` -- a confusing failure, not the clean
+ModuleNotFoundError you'd expect if apache-airflow just weren't
+installed -- when tests/test_airflow_dag.py was actually run against the
+project's main environment (which has no apache-airflow installed, so it
+should have skipped cleanly) during development. Not something reasoned
+out in advance and designed around; the airflow/ -> dags/ rename below
+happened only after that run surfaced it.
 """
 from __future__ import annotations
 
