@@ -23,6 +23,7 @@ Monthly source CSVs -> ETL modules (per-source cleaning) -> district cube (left-
 - `analytics/` -- correlation analysis over the cube, plus two `RandomForestRegressor` fits (`predict_lbw`, `predict_stunting`) kept in place and tested, but reported as findings rather than shipped predictors: LBW as a structured small-sample negative result, stunting as a leakage-checked correlation -- see [Model Layer Findings](#model-layer-findings).
 - `api/` -- FastAPI endpoints serving model predictions and district-level insight, with request/response schemas.
 - `models/` -- serialized model artifacts from `models_runner.py`.
+- `airflow/` -- the same chain expressed as an Airflow DAG, as an orchestration-tooling demonstration -- see [Airflow DAG](#airflow-dag-tooling-demonstration) below.
 
 ## Running it
 
@@ -55,7 +56,7 @@ pip install -r requirements.txt pytest httpx
 pytest -v
 ```
 
-81 tests (`pytest --collect-only`), verified against a clean CI-equivalent environment (`pip install -r requirements.txt`, `pip install flake8 mypy pytest httpx`, matching `.github/workflows/ci.yml` exactly -- the "httpx" package, not the similarly-named unrelated "httpx2" package a stale CI config once installed by mistake). Coverage spans:
+81 tests (`pytest --collect-only`), verified against a clean CI-equivalent environment (`pip install -r requirements.txt`, `pip install flake8 mypy pytest httpx`, matching `.github/workflows/ci.yml`'s `ci` job exactly -- the "httpx" package, not the similarly-named unrelated "httpx2" package a stale CI config once installed by mistake). Coverage spans:
 
 - **`tests/test_utils.py`** -- pure utility functions (`standardize_columns`, `normalize_awc_code`, `fill_missing`, `safe_corr`, `top_bottom`).
 - **`tests/test_etl_cleaner.py`** -- the generic loader-stage cleaning pass (`etl/cleaner.py`): column standardization, whitespace stripping, duplicate-row dropping, and that it doesn't mutate its input.
@@ -65,7 +66,9 @@ pytest -v
 - **`tests/test_models_integration.py`** -- runs `predict_lbw` / `predict_stunting` against a real `build_district_cube()` output (not an independently-named fixture), pinning the column-naming seam between the cube builder and the model layer so the two can't silently drift out of sync again (they did once -- see Synthetic Data Provenance below).
 - **`tests/test_api.py`** -- FastAPI endpoints via `TestClient`, with `joblib.load` / `pandas.read_csv` mocked so no model files are required to run the suite.
 
-CI runs the suite (plus flake8, mypy, and a Docker build for each of the three images) on every push to `main`.
+**Plus 11 more, in a separate job, not folded into the 81**: **`tests/test_airflow_dag.py`** parses `dags/poshan_pipeline_dag.py` and checks the resulting DAG object -- task IDs, dependency wiring (`generate` → `[warehouse_etl` + 10 `etl_module__*]` → `cube` → `models`), no cycles, retry config, the month-param default -- without deploying a scheduler or webserver. It needs `apache-airflow` installed, which conflicts with this project's own `pydantic`/FastAPI requirement (`apache-airflow==2.10.5`'s constraints pin `typing-extensions` below what `pydantic-core` needs -- confirmed via `pip check`, not assumed), so it deliberately does **not** run in the same environment as the 81 above, in its own isolated `airflow-dag-integrity` CI job with only `apache-airflow` installed. The main job's `pytest --collect-only` stays at exactly **81**, unchanged, verified directly rather than assumed additive: `test_airflow_dag.py` guards itself with a module-level `pytest.importorskip("airflow", ...)`, and a module-level skip removes the whole file from collection rather than counting its 11 tests as individually skipped (checked: `81 tests collected` in the main environment, not 92 with 11 skipped). Two jobs, two separate counts (81 and 11), reported as two numbers because that's what's actually true of two environments that don't -- and given the confirmed `pip check` conflict, can't -- coexist; see `tests/test_airflow_dag.py`'s own docstring for the full mechanics.
+
+CI runs both jobs (the main suite plus flake8/mypy/three Docker builds, and the isolated DAG-integrity job) on every push to `main`.
 
 ## Results: data-quality reconciliation
 
@@ -113,6 +116,12 @@ For an ETL/warehouse pipeline, "evaluation" means checking that the merge didn't
 **Stunting -- a leakage-checked correlation, not a validated predictor.** R² on the same 9-row holdout: mean-predictor baseline -0.291, single-feature linear on `suw_ratio` (severely-underweight rate) alone 0.487, full RandomForest (6 features) 0.883. Verified this is not a pipeline data leak: `stunting_total_pct` is computed entirely from the Growth Monitoring (5-6 years) report (`etl/gm_5_6.py`), `suw_ratio` entirely from the SNP Projections report (`etl/snp.py`) -- two independent source files, no shared columns or formula. The correlation is real and stated plainly: severely-underweight rate is strongly associated with stunting rate across these 30 districts (R²≈0.49, linear, one feature), consistent with both indicators reflecting chronic undernutrition. The RandomForest's higher 0.883 is not treated as a stronger version of that same finding -- at n=30 with a 9-row test set, R² is too unstable to support a validated-predictor claim, independent of how clean the leakage check came back.
 
 Full methodology -- the baseline-comparison code, the leakage-check trace, the full-history grain/panel sweep -- in [`docs/model_layer_audit.md`](docs/model_layer_audit.md).
+
+## Airflow DAG (tooling demonstration)
+
+**This pipeline does not need Airflow.** It's a linear, single-machine, single-month chain that runs in seconds -- the "Generate synthetic data" and "Build warehouse (ETL + cube)" steps in `.github/workflows/ci.yml` prove that on every push. [`airflow/`](airflow/) expresses the same chain as an Airflow DAG to demonstrate orchestration tooling, not because the pipeline's scale demanded it. At this scale a script suffices (and this repo already has several); the DAG's retry/backfill machinery below is illustrative of the pattern, not a fix for a transient-failure or multi-month problem this deterministic, seeded pipeline actually has.
+
+`dags/poshan_pipeline_dag.py`: `generate_synthetic_data` (seed 42) → [`warehouse_etl` + 10 per-source `etl_module__*` tasks, in parallel] → `build_cube` → `train_models`. Retries (2, 2-minute delay), `@monthly` schedule with `catchup=False`, and structural month-parameterization are all present and correctly wired -- and all standard-pattern, not solving a real problem here: `generate_synthetic_data` fails loudly for any month other than `2025-11`, the only one that has ever existed or been profiled (see Synthetic Data Provenance above), rather than fabricating one. `train_models` runs the same `predict_lbw`/`predict_stunting` fits documented in Model Layer Findings above -- running them from a DAG doesn't change what n=30 can support. Full framing, setup, and how to run it (LocalExecutor + docker-compose) in [`docs/airflow_dag.md`](docs/airflow_dag.md).
 
 ## Limitations
 

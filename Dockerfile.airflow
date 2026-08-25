@@ -1,0 +1,32 @@
+# Extends the official Airflow image with this project's own dependencies,
+# so PythonOperator task callables (which import etl.*, cubes.*,
+# analytics.* lazily - see dags/poshan_pipeline_dag.py) can actually run.
+#
+# Dependency note, checked both orders rather than assuming either:
+# installing this project's requirements.txt (pandas, scikit-learn,
+# FastAPI, ...) FIRST and apache-airflow SECOND is a real, confirmed
+# conflict (apache-airflow==2.10.5's pinned constraints force
+# typing-extensions down to a version pydantic/FastAPI rejects, per
+# `pip check`) - that's why tests/test_airflow_dag.py's DAG-integrity
+# test never installs apache-airflow alongside requirements.txt and runs
+# in its own isolated CI job instead. This Dockerfile installs in the
+# OPPOSITE order - apache-airflow base image first (with its own
+# constraints already resolved), requirements.txt layered on top second
+# - which was separately verified clean: `pip check` reports no broken
+# requirements, and a full import smoke test (pandas, fastapi, airflow,
+# plus airflow.www.app and airflow.cli.cli_parser specifically) all
+# succeed together. Order genuinely matters here; both were checked, not
+# just the one this file happens to use.
+FROM apache/airflow:2.10.5-python3.12
+
+# Airflow images run as the non-root `airflow` user by default; pip
+# installs as that user rather than switching to root.
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+# The project source (etl/, cubes/, analytics/, scripts/, utils/) is
+# mounted read-write at /opt/airflow/project by docker-compose.airflow.yaml
+# rather than baked into the image, so `data/`, `warehouse/`, and
+# `models/` output land back on the host - same convention as the
+# existing Dockerfile.etl / Dockerfile.cube / docker-compose.yml.
+ENV PYTHONPATH="/opt/airflow/project:${PYTHONPATH}"
