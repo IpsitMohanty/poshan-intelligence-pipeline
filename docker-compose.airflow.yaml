@@ -20,11 +20,15 @@
 # Default login: airflow / airflow - change before using this anywhere
 # beyond a local demo.
 #
-# Project code (etl/, cubes/, analytics/, scripts/, utils/, requirements.txt)
-# is baked into the image at build time via Dockerfile.airflow; data/,
-# warehouse/, and models/ are bind-mounted read-write so task output lands
-# back on the host - same convention docker-compose.yml uses for the
-# etl/cube/api services.
+# Project code (etl/, cubes/, analytics/, scripts/, utils/, main.py, ...)
+# is bind-mounted read-write at /opt/airflow/project, the whole repo root
+# in one mount - not baked into the image at build time (an earlier
+# version of this comment claimed that; it never actually was, and task
+# execution failed as a result - see PROJECT_ROOT below and
+# dags/poshan_pipeline_dag.py's _repo_root()). data/, warehouse/, and
+# models/ land back on the host as a natural consequence of being
+# subdirectories of that same mount - same convention docker-compose.yml
+# uses for the etl/cube/api services, just via one mount instead of three.
 
 x-airflow-common: &airflow-common
   build:
@@ -37,12 +41,23 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
     AIRFLOW__CORE__FERNET_KEY: ""
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+    # dags/poshan_pipeline_dag.py's _repo_root(): dags/ and the rest of
+    # the project are mounted at different, non-sibling container paths
+    # (below), so the DAG file's own file-relative "parent.parent"
+    # guess is wrong in-container. This makes it explicit instead.
+    PROJECT_ROOT: /opt/airflow/project
   volumes:
     - ./dags:/opt/airflow/dags
     - ./.airflow-logs:/opt/airflow/logs
-    - ./data:/opt/airflow/project/data
-    - ./warehouse:/opt/airflow/project/warehouse
-    - ./models:/opt/airflow/project/models
+    # The whole repo root, one mount: this is what makes etl.*/cubes.*/
+    # analytics.* importable (via PYTHONPATH=/opt/airflow/project in
+    # Dockerfile.airflow) AND scripts/generate_synthetic_data.py openable
+    # by the generate_synthetic_data task's subprocess call. Previously
+    # three narrower mounts (data/, warehouse/, models/ only) - found by
+    # actually running the DAG that this left every other directory
+    # (scripts/, etl/, cubes/, analytics/, utils/) absent from the
+    # container, failing every task from generate_synthetic_data onward.
+    - .:/opt/airflow/project
   depends_on: &airflow-common-depends-on
     postgres:
       condition: service_healthy

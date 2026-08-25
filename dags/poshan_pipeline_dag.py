@@ -99,9 +99,27 @@ def _month(context) -> str:
 
 
 def _repo_root():
+    import os
     from pathlib import Path
 
-    # dags/poshan_pipeline_dag.py -> repo root is one level up.
+    # In the Airflow container, dags/ is bind-mounted at /opt/airflow/dags
+    # while the rest of the project is bind-mounted SEPARATELY at
+    # /opt/airflow/project (docker-compose.airflow.yaml) - they are not
+    # siblings under a shared parent directory inside the container the
+    # way they are on the host (or in CI, where this function is never
+    # actually called - the DAG-integrity test only parses the DAG, never
+    # executes a task). Found by actually running the DAG, not reasoned
+    # out in advance: the file-relative computation below silently gave
+    # /opt/airflow as "repo root" in-container, and
+    # /opt/airflow/scripts/generate_synthetic_data.py doesn't exist -
+    # `can't open file '/opt/airflow/scripts/generate_synthetic_data.py':
+    # No such file or directory`. PROJECT_ROOT (set in
+    # docker-compose.airflow.yaml) overrides explicitly for that case.
+    override = os.environ.get("PROJECT_ROOT")
+    if override:
+        return Path(override)
+    # dags/poshan_pipeline_dag.py -> repo root is one level up. Correct
+    # for local dev and CI, where dags/'s parent genuinely is repo root.
     return Path(__file__).resolve().parent.parent
 
 
@@ -283,6 +301,12 @@ with DAG(
     max_active_runs=1,
     params={"month": ONLY_SUPPORTED_MONTH},
     tags=["demo", "poshan", "orchestration-tooling"],
+    # Airflow pauses every newly-discovered DAG by default; found by
+    # actually triggering this one - the first run just sat queued
+    # because the DAG itself was paused, not because of any task issue.
+    # docs/airflow_dag.md's "trigger it" instructions should work without
+    # a manual unpause step first.
+    is_paused_upon_creation=False,
 ) as dag:
 
     t_generate = PythonOperator(
