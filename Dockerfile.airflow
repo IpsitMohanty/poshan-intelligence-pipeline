@@ -29,4 +29,16 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt
 # rather than baked into the image, so `data/`, `warehouse/`, and
 # `models/` output land back on the host - same convention as the
 # existing Dockerfile.etl / Dockerfile.cube / docker-compose.yml.
+#
+# PYTHONPATH is declared as a build ARG (default empty) before being
+# referenced in ENV, rather than interpolating ${PYTHONPATH} directly:
+# without a preceding ARG/ENV in this build stage, BuildKit can't confirm
+# what that expands to and flags it (`UndefinedVar: Usage of undefined
+# variable '$PYTHONPATH'`) - real risk, not cosmetic, since an
+# undefined/empty expansion here would silently drop /opt/airflow/project
+# and break every task callable's etl.*/cubes.*/analytics.* import. The
+# ARG default of "" preserves the intended "prepend, don't clobber"
+# behavior if the base image ever does set PYTHONPATH, while making the
+# build warning-free either way.
+ARG PYTHONPATH=""
 ENV PYTHONPATH="/opt/airflow/project:${PYTHONPATH}"
