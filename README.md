@@ -23,7 +23,7 @@ Monthly source CSVs -> ETL modules (per-source cleaning) -> district cube (left-
 - `analytics/` -- correlation analysis over the cube, plus two `RandomForestRegressor` fits (`predict_lbw`, `predict_stunting`) kept in place and tested, but reported as findings rather than shipped predictors: LBW as a structured small-sample negative result, stunting as a leakage-checked correlation -- see [Model Layer Findings](#model-layer-findings).
 - `api/` -- FastAPI endpoints serving model predictions and district-level insight, with request/response schemas.
 - `models/` -- serialized model artifacts from `models_runner.py`.
-- `airflow/` -- the same chain expressed as an Airflow DAG, as an orchestration-tooling demonstration -- see [Airflow DAG](#airflow-dag-tooling-demonstration) below.
+- `dags/` -- the same chain expressed as an Airflow DAG, as an orchestration-tooling demonstration -- see [Airflow DAG](#airflow-dag-tooling-demonstration) below.
 
 ## Running it
 
@@ -119,7 +119,7 @@ Full methodology -- the baseline-comparison code, the leakage-check trace, the f
 
 ## Airflow DAG (tooling demonstration)
 
-**This pipeline does not need Airflow.** It's a linear, single-machine, single-month chain that runs in seconds -- the "Generate synthetic data" and "Build warehouse (ETL + cube)" steps in `.github/workflows/ci.yml` prove that on every push. [`airflow/`](airflow/) expresses the same chain as an Airflow DAG to demonstrate orchestration tooling, not because the pipeline's scale demanded it. At this scale a script suffices (and this repo already has several); the DAG's retry/backfill machinery below is illustrative of the pattern, not a fix for a transient-failure or multi-month problem this deterministic, seeded pipeline actually has.
+**This pipeline does not need Airflow.** It's a linear, single-machine, single-month chain that runs in seconds -- the "Generate synthetic data" and "Build warehouse (ETL + cube)" steps in `.github/workflows/ci.yml` prove that on every push. [`dags/`](dags/) expresses the same chain as an Airflow DAG to demonstrate orchestration tooling, not because the pipeline's scale demanded it. At this scale a script suffices (and this repo already has several); the DAG's retry/backfill machinery below is illustrative of the pattern, not a fix for a transient-failure or multi-month problem this deterministic, seeded pipeline actually has.
 
 `dags/poshan_pipeline_dag.py`: `generate_synthetic_data` (seed 42) → [`warehouse_etl` + 10 per-source `etl_module__*` tasks, in parallel] → `build_cube` → `train_models`. Retries (2, 2-minute delay), `@monthly` schedule with `catchup=False`, and structural month-parameterization are all present and correctly wired -- and all standard-pattern, not solving a real problem here: `generate_synthetic_data` fails loudly for any month other than `2025-11`, the only one that has ever existed or been profiled (see Synthetic Data Provenance above), rather than fabricating one. `train_models` runs the same `predict_lbw`/`predict_stunting` fits documented in Model Layer Findings above -- running them from a DAG doesn't change what n=30 can support. Full framing, setup, and how to run it (LocalExecutor + docker-compose) in [`docs/airflow_dag.md`](docs/airflow_dag.md).
 
