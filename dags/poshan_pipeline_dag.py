@@ -117,10 +117,39 @@ def _repo_root():
     # docker-compose.airflow.yaml) overrides explicitly for that case.
     override = os.environ.get("PROJECT_ROOT")
     if override:
-        return Path(override)
-    # dags/poshan_pipeline_dag.py -> repo root is one level up. Correct
-    # for local dev and CI, where dags/'s parent genuinely is repo root.
-    return Path(__file__).resolve().parent.parent
+        root = Path(override)
+    else:
+        # dags/poshan_pipeline_dag.py -> repo root is one level up.
+        # Correct for local dev and CI, where dags/'s parent genuinely is
+        # repo root; wrong in-container (see above), which is exactly
+        # why the check below exists rather than trusting either branch
+        # silently.
+        root = Path(__file__).resolve().parent.parent
+
+    # Validate before returning, every time, rather than letting a wrong
+    # root surface later as a generic "file not found" three call frames
+    # away in a subprocess. This is what makes the PROJECT_ROOT/mount
+    # pairing self-diagnosing instead of silently wrong again if they
+    # ever drift apart (container recreated without picking up a
+    # docker-compose.airflow.yaml change, a typo in the mount target,
+    # etc.) - the previous version of this function trusted PROJECT_ROOT
+    # unconditionally and the actual failure mode (env var set correctly
+    # in the compose file, task still resolved the wrong path) was never
+    # distinguishable from "PROJECT_ROOT isn't reaching the task process
+    # at all" without exactly this kind of check.
+    marker = root / "scripts" / "generate_synthetic_data.py"
+    if not marker.is_file():
+        raise AirflowException(
+            f"_repo_root() resolved to {root!r}, but {marker!r} doesn't exist there "
+            f"- this isn't the project root. PROJECT_ROOT env var: {override!r} "
+            f"(None means unset, in which case the file-relative fallback "
+            f"{Path(__file__).resolve().parent.parent!r} was used instead). "
+            "If this is the Airflow container: check docker-compose.airflow.yaml's "
+            "PROJECT_ROOT value actually matches its `.:/opt/airflow/project` mount "
+            "target, and that the container was recreated (not just restarted) "
+            "after any change to either."
+        )
+    return root
 
 
 # ---------------------------------------------------------------------
