@@ -21,3 +21,7 @@ plots/
 bi_subset_*.csv
 district_cube_*.csv
 correlation_pairs.csv
+
+# --- Airflow local runtime (docker-compose.airflow.yaml bind-mounts
+# this; the stack itself, and its Postgres volume, are not committed) ---
+.airflow-logs/

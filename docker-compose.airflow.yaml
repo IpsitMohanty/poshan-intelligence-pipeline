@@ -1,0 +1,128 @@
+# LocalExecutor Airflow stack for the poshan_intelligence_pipeline DAG.
+#
+# Trimmed from Airflow's official reference docker-compose.yaml
+# (https://airflow.apache.org/docs/apache-airflow/2.10.5/docker-compose.yaml)
+# for LocalExecutor instead of CeleryExecutor: no Redis, no separate
+# worker/flower services - LocalExecutor runs tasks as local subprocesses
+# of the scheduler itself, which is already more than this pipeline needs,
+# not less (see docs/airflow_dag.md and the README's "Airflow DAG" section
+# for why this is a tooling demo, not a scale need).
+#
+# A sibling file to docker-compose.yml (the etl/cube/api services), kept
+# separate rather than merged into it: this stack (Postgres + webserver +
+# scheduler) is meaningfully heavier than what the pipeline itself needs
+# to run, and mixing "orchestration demo" services into the pipeline's own
+# compose file would misrepresent one as a dependency of the other.
+#
+# Run from the repo root:
+#   docker compose -f docker-compose.airflow.yaml up airflow-init   # one-time: DB init + admin user
+#   docker compose -f docker-compose.airflow.yaml up                # webserver (localhost:8080) + scheduler
+# Default login: airflow / airflow - change before using this anywhere
+# beyond a local demo.
+#
+# Project code (etl/, cubes/, analytics/, scripts/, utils/, main.py, ...)
+# is bind-mounted read-write at /opt/airflow/project, the whole repo root
+# in one mount - not baked into the image at build time (an earlier
+# version of this comment claimed that; it never actually was, and task
+# execution failed as a result - see PROJECT_ROOT below and
+# dags/poshan_pipeline_dag.py's _repo_root()). data/, warehouse/, and
+# models/ land back on the host as a natural consequence of being
+# subdirectories of that same mount - same convention docker-compose.yml
+# uses for the etl/cube/api services, just via one mount instead of three.
+
+x-airflow-common: &airflow-common
+  build:
+    context: .
+    dockerfile: Dockerfile.airflow
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+    AIRFLOW__CORE__FERNET_KEY: ""
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+    # dags/poshan_pipeline_dag.py's _repo_root(): dags/ and the rest of
+    # the project are mounted at different, non-sibling container paths
+    # (below), so the DAG file's own file-relative "parent.parent"
+    # guess is wrong in-container. This makes it explicit instead.
+    PROJECT_ROOT: /opt/airflow/project
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./.airflow-logs:/opt/airflow/logs
+    # The whole repo root, one mount: this is what makes etl.*/cubes.*/
+    # analytics.* importable (via PYTHONPATH=/opt/airflow/project in
+    # Dockerfile.airflow) AND scripts/generate_synthetic_data.py openable
+    # by the generate_synthetic_data task's subprocess call. Previously
+    # three narrower mounts (data/, warehouse/, models/ only) - found by
+    # actually running the DAG that this left every other directory
+    # (scripts/, etl/, cubes/, analytics/, utils/) absent from the
+    # container, failing every task from generate_synthetic_data onward.
+    - .:/opt/airflow/project
+  depends_on: &airflow-common-depends-on
+    postgres:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate
+        airflow users create \
+          --username airflow --password airflow \
+          --firstname Airflow --lastname Admin \
+          --role Admin --email admin@example.com || true
+    environment:
+      <<: *airflow-common-env
+    depends_on:
+      <<: *airflow-common-depends-on
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+volumes:
+  postgres-db-volume:
